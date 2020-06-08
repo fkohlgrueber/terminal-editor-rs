@@ -1,0 +1,12 @@
+[package]
+name = "terminal-editor"
+version = "0.1.0"
+authors = ["Felix Kohlgrüber <felix.kohlgrueber@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+crossterm = "0.17.5"
+clap = "2.33.1"
+anyhow = "1.0.31"

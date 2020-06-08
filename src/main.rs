@@ -1,12 +1,12 @@
-use std::io::{Write, stdout};
-use clap::{App, Arg}; 
+use clap::{App, Arg};
 use crossterm::{
     cursor,
-    execute, queue,
     event::{Event, KeyCode, KeyModifiers},
-    style::{Print, SetForegroundColor, SetBackgroundColor, Color},
+    execute, queue,
+    style::{Color, Print, SetBackgroundColor, SetForegroundColor},
     terminal::{EnterAlternateScreen, LeaveAlternateScreen},
 };
+use std::io::{stdout, Write};
 
 struct Model {
     exit: bool,
@@ -24,7 +24,7 @@ impl Model {
                 match &(key_event.code, key_event.modifiers) {
                     // exit
                     (KeyCode::Char('q'), KeyModifiers::CONTROL) => self.exit = true,
-                    
+
                     // save
                     (KeyCode::Char('s'), KeyModifiers::CONTROL) => {
                         let s = self.content_to_string();
@@ -49,14 +49,16 @@ impl Model {
                         } else if self.cursor.0 == 0 && self.cursor.1 > 0 {
                             self.cursor.1 -= 1;
                             self.cursor.0 = self.content[self.cursor.1].len();
-                        } 
+                        }
                     }
                     (KeyCode::Right, KeyModifiers::NONE) => {
                         let curr_line_len = self.content[self.cursor.1].len();
                         self.cursor.0 = std::cmp::min(self.cursor.0, curr_line_len);
                         if self.cursor.0 < curr_line_len {
                             self.cursor.0 += 1;
-                        } else if self.cursor.0 == curr_line_len && self.cursor.1 < self.content.len() - 1 {
+                        } else if self.cursor.0 == curr_line_len
+                            && self.cursor.1 < self.content.len() - 1
+                        {
                             self.cursor.0 = 0;
                             self.cursor.1 += 1;
                         }
@@ -116,31 +118,35 @@ impl Model {
             }
         }
     }
-    
+
     fn view(&self) -> crossterm::Result<()> {
         // header
         queue!(
             stdout(),
-
             cursor::MoveTo(0, 0),
             SetForegroundColor(Color::Black),
             SetBackgroundColor(Color::White),
         )?;
         let is_dirty = match &self.orig {
             Some(s) => &self.content_to_string() != s,
-            None => true
+            None => true,
         };
-        self.print_line(&format!("  {} {}", self.file_path, if is_dirty {'*'} else {' '}))?;
-        
+        self.print_line(&format!(
+            "  {} {}",
+            self.file_path,
+            if is_dirty { '*' } else { ' ' }
+        ))?;
+
         // content
         queue!(
             stdout(),
-
             SetForegroundColor(Color::Reset),
             SetBackgroundColor(Color::Reset),
         )?;
         for i in 0..(self.dimensions.1 - 2) {
-            let line_str = self.content.get(i)
+            let line_str = self
+                .content
+                .get(i)
                 .map(|line| line.iter().take(self.dimensions.0).collect())
                 .unwrap_or("".to_string());
             self.print_line(&line_str)?;
@@ -149,20 +155,16 @@ impl Model {
         // footer
         queue!(
             stdout(),
-
             SetForegroundColor(Color::Black),
             SetBackgroundColor(Color::White),
         )?;
         self.print_line(&format!("  Ctrl-Q: Quit  Ctrl-S: Save"))?;
-        
+
         // move cursor
         queue!(
             stdout(),
-            
             cursor::MoveTo(
-                std::cmp::min(
-                    self.cursor.0, 
-                    self.content[self.cursor.1].len()) as u16, 
+                std::cmp::min(self.cursor.0, self.content[self.cursor.1].len()) as u16,
                 self.cursor.1 as u16 + 1
             )
         )?;
@@ -175,18 +177,15 @@ impl Model {
 
     fn print_line(&self, s: &str) -> crossterm::Result<()> {
         let fill = " ".repeat(self.dimensions.0 - s.chars().count());
-        queue!(
-            stdout(),
-
-            Print(s),
-            Print(fill),
-        )
+        queue!(stdout(), Print(s), Print(fill),)
     }
 
     fn content_to_string(&self) -> String {
         let mut s = String::new();
         for (idx, line) in self.content.iter().enumerate() {
-            if idx > 0 { s.push('\n') }
+            if idx > 0 {
+                s.push('\n')
+            }
             for c in line {
                 s.push(*c);
             }
@@ -195,15 +194,17 @@ impl Model {
     }
 }
 
-fn main() -> anyhow::Result<()> { 
+fn main() -> anyhow::Result<()> {
     // parse command line arguments
     let matches = App::new("terminal-editor")
-       .about("A simple terminal text editor!")
-       .arg(Arg::with_name("FILE")
-            .help("Sets the input file to use")
-            .required(true)
-            .index(1))
-       .get_matches();
+        .about("A simple terminal text editor!")
+        .arg(
+            Arg::with_name("FILE")
+                .help("Sets the input file to use")
+                .required(true)
+                .index(1),
+        )
+        .get_matches();
     let path = matches.value_of("FILE").unwrap().to_string();
 
     // try to read file. If unsuccessful (e.g. file doesn't exist), use empty string.
@@ -212,24 +213,24 @@ fn main() -> anyhow::Result<()> {
         Some(s) => {
             let mut res: Vec<Vec<char>> = s.lines().map(|x| x.chars().collect()).collect();
             match s.chars().last() {
-                None | Some('\n') => res.push(vec!()),
+                None | Some('\n') => res.push(vec![]),
                 _ => {}
             }
             res
-        },
-        None => vec!(vec!())
+        }
+        None => vec![vec![]],
     };
 
     // setup terminal
     let mut stdout = std::io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
     crossterm::terminal::enable_raw_mode()?;
-    
+
     // create model
     let mut model = Model {
         exit: false,
         file_path: path,
-        dimensions: crossterm::terminal::size().map(|(x,y)| (x as usize, y as usize))?,
+        dimensions: crossterm::terminal::size().map(|(x, y)| (x as usize, y as usize))?,
         content: content,
         orig: text,
         cursor: (0, 0),

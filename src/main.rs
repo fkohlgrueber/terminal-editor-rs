@@ -1,4 +1,4 @@
-use clap::{App, Arg};
+use clap::{Arg, Command};
 use crossterm::{
     cursor,
     event::{Event, KeyCode, KeyModifiers},
@@ -28,7 +28,7 @@ impl Model {
                     // save
                     (KeyCode::Char('s'), KeyModifiers::CONTROL) => {
                         let s = self.content_to_string();
-                        if let Ok(_) = std::fs::write(&self.file_path, &s) {
+                        if std::fs::write(&self.file_path, &s).is_ok() {
                             self.orig = Some(s);
                         }
                     }
@@ -113,8 +113,8 @@ impl Model {
             Event::Resize(x, y) => {
                 self.dimensions = (x as usize, y as usize);
             }
-            Event::Mouse(_) => {
-                // don't handle mouse events
+            _ => {
+                // ignore other event types
             }
         }
     }
@@ -148,7 +148,7 @@ impl Model {
                 .content
                 .get(i)
                 .map(|line| line.iter().take(self.dimensions.0).collect())
-                .unwrap_or("".to_string());
+                .unwrap_or_else(String::new);
             self.print_line(&line_str)?;
         }
 
@@ -158,7 +158,7 @@ impl Model {
             SetForegroundColor(Color::Black),
             SetBackgroundColor(Color::White),
         )?;
-        self.print_line(&format!("  Ctrl-Q: Quit  Ctrl-S: Save"))?;
+        self.print_line("  Ctrl-Q: Quit  Ctrl-S: Save")?;
 
         // move cursor
         queue!(
@@ -196,19 +196,19 @@ impl Model {
 
 fn main() -> anyhow::Result<()> {
     // parse command line arguments
-    let matches = App::new("terminal-editor")
+    let matches = Command::new("terminal-editor")
         .about("A simple terminal text editor!")
         .arg(
-            Arg::with_name("FILE")
+            Arg::new("FILE")
                 .help("Sets the input file to use")
                 .required(true)
                 .index(1),
         )
         .get_matches();
-    let path = matches.value_of("FILE").unwrap().to_string();
+    let path = matches.get_one::<String>("FILE").unwrap();
 
     // try to read file. If unsuccessful (e.g. file doesn't exist), use empty string.
-    let text = std::fs::read_to_string(&path).ok();
+    let text = std::fs::read_to_string(path).ok();
     let content = match &text {
         Some(s) => {
             let mut res: Vec<Vec<char>> = s.lines().map(|x| x.chars().collect()).collect();
@@ -229,9 +229,9 @@ fn main() -> anyhow::Result<()> {
     // create model
     let mut model = Model {
         exit: false,
-        file_path: path,
+        file_path: path.clone(),
         dimensions: crossterm::terminal::size().map(|(x, y)| (x as usize, y as usize))?,
-        content: content,
+        content,
         orig: text,
         cursor: (0, 0),
     };
